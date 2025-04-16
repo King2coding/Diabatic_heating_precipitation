@@ -16,7 +16,7 @@ directory = r'/ra1/pubdat/AVHRR_CloudSat_proj/codes'
 # Add the directory to the system path
 sys.path.append(directory)
 
-from utils_precipitation_comparison import* 
+# from utils_precipitation_comparison import* 
 
 
 #%%
@@ -116,15 +116,16 @@ def plot_zonal_means(zonal_means, ylabel='Zonal mean', xlabel='Latitude', filena
         plt.savefig(filename,bbox_inches='tight')
     plt.show()
 #------------------------------------------------------------
-def plot_mean_maps(gpcp_data, dhp_data, gpcp_var='sat_gauge_precip', dhp_var='precip_heating', vmin=0, vmax=20, filename=None):
+def plot_mean_maps(gpcp_data1, gpcp_data2, dhp_data, gpcp_var='sat_gauge_precip', 
+                   dhp_var='precip_heating', vmin=0, vmax=20, filename=None):
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6), subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6), subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True)
 
-    # Plot GPCP data
-    gpcp_plot = gpcp_data[gpcp_var].plot(
+    # Plot GPCP data 1
+    gpcp1_plot = gpcp_data1[gpcp_var].plot(
         ax=axes[0],
         transform=ccrs.PlateCarree(),
         cmap='jet',
@@ -132,19 +133,19 @@ def plot_mean_maps(gpcp_data, dhp_data, gpcp_var='sat_gauge_precip', dhp_var='pr
         vmin=vmin,
         vmax=vmax,
     )
-    axes[0].set_title('GPCP Mean Map', fontsize=18)
+    axes[0].set_title('GPCP V3.2', fontsize=16)
     axes[0].coastlines()
     axes[0].add_feature(cfeature.BORDERS, linestyle=':')
     gl0 = axes[0].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
-    
-    # Remove top x-axis and right y-axis labels for ax[0]
     gl0.right_labels = False
     gl0.top_labels = False
+    gl0.xlabel_style = {'fontsize': 14}
+    gl0.ylabel_style = {'fontsize': 14}
     axes[0].yaxis.set_label_position("left")
     axes[0].xaxis.set_label_position("bottom")
-    
-    # Plot Diabatic precip_heating data
-    dhp_plot = dhp_data[dhp_var].plot(
+
+    # Plot GPCP data 2
+    gpcp2_plot = gpcp_data2[gpcp_var].plot(
         ax=axes[1],
         transform=ccrs.PlateCarree(),
         cmap='jet',
@@ -152,29 +153,53 @@ def plot_mean_maps(gpcp_data, dhp_data, gpcp_var='sat_gauge_precip', dhp_var='pr
         vmin=vmin,
         vmax=vmax,
     )
-    axes[1].set_title('Diabatic Precipitation Heating Mean Map', fontsize=18)
+    axes[1].set_title('GPCP V3.3', fontsize=16)
     axes[1].coastlines()
     axes[1].add_feature(cfeature.BORDERS, linestyle=':')
     gl1 = axes[1].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
-    
-    # Adjust labels for ax[1]
-    gl1.left_labels = False  # No y-label on the left side for ax[1]
-    gl1.right_labels = True
+    gl1.left_labels = False
+    gl1.right_labels = False
     gl1.top_labels = False
+    gl1.xlabel_style = {'fontsize': 14}
+    gl1.ylabel_style = {'fontsize': 14}
     axes[1].xaxis.set_label_position("bottom")
 
+    # Plot Diabatic precip_heating data
+    dhp_plot = dhp_data[dhp_var].plot(
+        ax=axes[2],
+        transform=ccrs.PlateCarree(),
+        cmap='jet',
+        add_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    axes[2].set_title('Diabatic Precipitation Heating', fontsize=16)
+    axes[2].coastlines()
+    axes[2].add_feature(cfeature.BORDERS, linestyle=':')
+    gl2 = axes[2].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
+    gl2.left_labels = False
+    gl2.right_labels = True
+    gl2.top_labels = False
+    gl2.xlabel_style = {'fontsize': 14}
+    gl2.ylabel_style = {'fontsize': 14}
+    axes[2].xaxis.set_label_position("bottom")
+
+    # Adjust aspect ratio for all subplots
+    for a in axes.flat:
+        a.set_aspect('auto')
+
     # Increase font sizes for x and y tick labels
-    axes[0].tick_params(axis='both', which='major', labelsize=18)
-    axes[1].tick_params(axis='both', which='major', labelsize=18)
+    for ax in axes:
+        ax.tick_params(axis='both', which='major', labelsize=16)
 
     # Add a single color bar below the plots
-    cbar = fig.colorbar(gpcp_plot, ax=axes, orientation='horizontal', fraction=0.046, pad=0.1)
+    cbar = fig.colorbar(gpcp1_plot, ax=axes, orientation='horizontal', fraction=0.046, pad=0.1)
     cbar.set_label('Mean Precipitation (mm/day)', fontsize=15)
-    cbar.ax.tick_params(labelsize=15)  # Increase font size of colorbar tick labels
+    cbar.ax.tick_params(labelsize=15)
 
     # Save the figure if a filename is provided
     if filename:
-        plt.savefig(filename,bbox_inches='tight')
+        plt.savefig(filename, bbox_inches='tight')
     plt.show()
 
 #------------------------------------------------------------
@@ -298,10 +323,49 @@ def load_ascii_data_to_xr(file_path):
 
 
     return ds, prdt_nme
+
+#-----------------------------------------------------------------------
+def retrun_gpcp_xr_data(gpcp_files):
+    data_vals = []
+    for i in gpcp_files:
+        gpcp_data = xr.open_dataset(i) 
+
+        gpcp_data_time = pd.to_datetime(gpcp_data.coords['time'].values[0]).to_pydatetime().date()
+
+        gpcp_data_ = gpcp_data.copy()
+
+        gpcp_data_ = gpcp_data_.rename({'lon':'x', 'lat':'y'})
+
+        # Write the CRS to the dataset
+        gpcp_data_ = gpcp_data_.rio.write_crs(cc.to_string(), inplace=True)
+
+        # Exclude non-spatial variables before reprojection
+        spatial_vars = [var for var in gpcp_data_.data_vars if 'x' in gpcp_data_[var].dims and 'y' in gpcp_data_[var].dims]
+        gpcp_data_spatial = gpcp_data_[spatial_vars]
+
+        # Reproject the data to match the desired shape
+        gpcp_data_spatial = gpcp_data_spatial.rio.reproject(
+            gpcp_data_spatial.rio.crs, 
+            shape=(72, 144),  # Set the shape as the desired shape
+            resampling=Resampling.average,
+        )
+
+        # Combine the reprojected spatial data back with non-spatial data if needed
+        gpcp_data_ = xr.merge([gpcp_data_spatial, gpcp_data_.drop_vars(spatial_vars)])
+
+        gpcp_data_spatial = gpcp_data_spatial.rename({'x':'lon', 'y':'lat'})
+
+        data_vals.append(gpcp_data_spatial)
+
+    # lon,lat  = gpcp_data_spatial.lon.values, gpcp_data_spatial.lat.values
+
+    gpcp_xr_data = xr.concat(data_vals, dim='time')
+
+    return gpcp_xr_data
 #%%
-data_path = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/data'
+data_path = r'/ra1/pubdat/AVHRR_CloudSat_proj/diabatic_heating_precipitation_200101_201812/data'
 gpcp_data_path = r'/ra1/pubdat/AVHRR_CloudSat_proj/diabatic_heating_precipitation_200101_201812/data/GPCP_200101_201812/'
-path_to_put_plots = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/results/plots'
+path_to_put_plots = r'/home/kkumah/Projects/Diabatic_heating_precipitation_200101_201812/results/plots'
 
 #%%
 cde_run_dte = str(date.today().strftime('%Y%m%d'))
@@ -404,68 +468,165 @@ aligned_dhp_data = aligned_dhp_data.rio.reproject(aligned_dhp_data.rio.crs,
 aligned_dhp_data_mean = aligned_dhp_data.mean(dim='nm',skipna=True)
 
 #%%
-gpcp_files = [os.path.join(gpcp_data_path,x) for x in os.listdir(gpcp_data_path) if x.endswith('.nc4')]
+gpcp_v32_data_path = os.path.join(gpcp_data_path,'data_v3.2')
+gpcp_filesv32 = [os.path.join(gpcp_v32_data_path,x) for x in os.listdir(gpcp_v32_data_path) if x.endswith('.nc4')]
 
-data_vals = []
-for i in gpcp_files:
-    gpcp_data = xr.open_dataset(i) 
+gpcpV32_xr_data = retrun_gpcp_xr_data(gpcp_filesv32)
+gpcpV32_xr_data_mean = gpcpV32_xr_data.mean(dim='time',skipna=True)
 
-    gpcp_data_time = pd.to_datetime(gpcp_data.coords['time'].values[0]).to_pydatetime().date()
 
-    gpcp_data_ = gpcp_data.copy()
+#-----------------------------------------------------------------------------------------
+gpcp_v33_data_path = os.path.join(gpcp_data_path,'data_v3.3')
+gpcp_filesv33 = [os.path.join(gpcp_v33_data_path,x) for x in os.listdir(gpcp_v33_data_path) if x.endswith('.nc4')]
 
-    gpcp_data_ = gpcp_data_.rename({'lon':'x', 'lat':'y'})
-
-    # Write the CRS to the dataset
-    gpcp_data_ = gpcp_data_.rio.write_crs(cc.to_string(), inplace=True)
-
-    # Exclude non-spatial variables before reprojection
-    spatial_vars = [var for var in gpcp_data_.data_vars if 'x' in gpcp_data_[var].dims and 'y' in gpcp_data_[var].dims]
-    gpcp_data_spatial = gpcp_data_[spatial_vars]
-
-    # Reproject the data to match the desired shape
-    gpcp_data_spatial = gpcp_data_spatial.rio.reproject(
-        gpcp_data_spatial.rio.crs, 
-        shape=(72, 144),  # Set the shape as the desired shape
-        resampling=Resampling.average,
-    )
-
-    # Combine the reprojected spatial data back with non-spatial data if needed
-    gpcp_data_ = xr.merge([gpcp_data_spatial, gpcp_data_.drop_vars(spatial_vars)])
-
-    gpcp_data_spatial = gpcp_data_spatial.rename({'x':'lon', 'y':'lat'})
-
-    data_vals.append(gpcp_data_spatial)
-
-# lon,lat  = gpcp_data_spatial.lon.values, gpcp_data_spatial.lat.values
-
-gpcp_xr_data = xr.concat(data_vals, dim='time')
-
-gpcp_data_mean = gpcp_xr_data.mean(dim='time',skipna=True)
+gpcpV33_xr_data = retrun_gpcp_xr_data(gpcp_filesv33)
+gpcpV33_xr_data_mean = gpcpV33_xr_data.mean(dim='time',skipna=True)
 
 # xt = gpcp_xr_data.groupby('lat').mean(dim=['time', 'lon'])
 
 #%%
 # zonal mean claculate
 # Extract the time coordinate from gpcp_xr_data
-time_coord = gpcp_xr_data.coords['time']
+time_coord = gpcpV32_xr_data.coords['time']
 
 # Assign the time coordinate to aligned_dhp_data
 aligned_dhp_data_with_time = aligned_dhp_data.assign_coords(time=time_coord)
 
-dat_arr = [('precip_heating',aligned_dhp_data_with_time),('GPCP', gpcp_xr_data)]
+# dat_arr = [('precip_heating',aligned_dhp_data_with_time),('GPCP', gpcp_xr_data)]
 
-gpcp_xr_data_sel = gpcp_xr_data.sel(time='2001-01-01')
+# gpcp_xr_data_sel = gpcp_xr_data.sel(time='2001-01-01')
 
 
 
 # Example usage
 nme = os.path.join(path_to_put_plots,'mean_maps_' + cde_run_dte + '.png')
-plot_mean_maps(gpcp_data_mean, aligned_dhp_data_mean, filename=nme)
+plot_mean_maps(gpcpV32_xr_data_mean,gpcpV33_xr_data_mean, aligned_dhp_data_mean, filename=nme)
 
 
+# plot the difference maps between gpcps and dhp data_arrays
+def plot_difference_maps(gpcp_data1, gpcp_data2, dhp_data, gpcp_var='sat_gauge_precip', 
+                         dhp_var='precip_heating', vmin=-10, vmax=10, filename=None):
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6), 
+                    subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True)    
+
+    # Plot difference between GPCP V3.2 and DHP
+    diff1 = gpcp_data1[gpcp_var] - dhp_data[dhp_var]
+    diff1_plot = diff1.plot(
+        ax=axes[1],
+        transform=ccrs.PlateCarree(),
+        cmap='RdBu',
+        add_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    axes[0].set_title('GPCP V3.2 - DHP', fontsize=16)
+    axes[0].coastlines()
+    axes[0].add_feature(cfeature.BORDERS, linestyle=':')
+    gl1 = axes[1].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
+    gl1.left_labels = False
+    gl1.right_labels = False
+    gl1.top_labels = False
+    gl1.xlabel_style = {'fontsize': 14}
+    gl1.ylabel_style = {'fontsize': 14}
+    axes[0].xaxis.set_label_position("bottom")
+
+    # Plot difference between GPCP V3.3 and DHP
+    diff2 = gpcp_data2[gpcp_var] - dhp_data[dhp_var]
+    diff2_plot = diff2.plot(
+        ax=axes[2],
+        transform=ccrs.PlateCarree(),
+        cmap='RdBu',
+        add_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    axes[1].set_title('GPCP V3.3 - DHP', fontsize=16)
+    axes[1].coastlines()
+    axes[1].add_feature(cfeature.BORDERS, linestyle=':')
+    gl2 = axes[2].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
+    gl2.left_labels = False
+    gl2.right_labels = True
+    gl2.top_labels = False
+    gl2.xlabel_style = {'fontsize': 14}
+    gl2.ylabel_style = {'fontsize': 14}
+    axes[2].xaxis.set_label_position("bottom")
+
+    # Adjust aspect ratio for all subplots
+    for a in axes.flat:
+        a.set_aspect('auto')
+
+    # Increase font sizes for x and y tick labels
+    for ax in axes:
+        ax.tick_params(axis='both', which='major', labelsize=16)
+
+    # Add a single color bar below the plots
+    cbar = fig.colorbar(diff1_plot, ax=axes, orientation='horizontal', fraction=0.046, pad=0.1)
+    cbar.set_label('Difference in Mean Precipitation (mm/day)', fontsize=15)
+    cbar.ax.tick_params(labelsize=15)
+
+    # Save the figure if a filename is provided
+    if filename:
+        plt.savefig(filename, bbox_inches='tight')
+    plt.show()
+
+# Example usage
+nme_diff = os.path.join(path_to_put_plots, 'difference_maps_' + cde_run_dte + '.png')
+plot_difference_maps(gpcpV32_xr_data_mean, gpcpV33_xr_data_mean, aligned_dhp_data_mean, filename=nme_diff)
+# Calculate and plot the difference between GPCP V3.2 and DHP
+diff_gpcpV32_dhp = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+diff_gpcpV32_dhp_plot = diff_gpcpV32_dhp.plot(
+    cmap='RdBu',
+    vmin=-10,
+    vmax=10,
+    figsize=(10, 6),
+    cbar_kwargs={'label': 'Difference (mm/day)'}
+)
+plt.title('Difference: GPCP V3.2 - DHP', fontsize=16)
+plt.xlabel('Longitude', fontsize=14)
+plt.ylabel('Latitude', fontsize=14)
+plt.show()
+
+# Calculate and plot the difference between GPCP V3.3 and DHP
+diff_gpcpV33_dhp = gpcpV33_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+diff_gpcpV33_dhp_plot = diff_gpcpV33_dhp.plot(
+    cmap='RdBu',
+    vmin=-10,
+    vmax=10,
+    figsize=(10, 6),
+    cbar_kwargs={'label': 'Difference (mm/day)'}
+)
+plt.title('Difference: GPCP V3.3 - DHP', fontsize=16)
+plt.xlabel('Longitude', fontsize=14)
+plt.ylabel('Latitude', fontsize=14)
+plt.show()
 #%%
-# AMIP6 and CIMP6 analysis
+# Calculate and plot the difference between GPCP V3.2 and DHP
+diff_gpcpV32_dhp = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+diff_gpcpV32_dhp.plot(
+    cmap='RdBu',
+    vmin=-10,
+    vmax=10,
+    figsize=(10, 6),
+    cbar_kwargs={'label': 'Difference (mm/day)'}
+)
+plt.title('Difference: GPCP V3.2 - DHP', fontsize=16)
+plt.show()
+
+# Calculate and plot the difference between GPCP V3.3 and DHP
+diff_gpcpV33_dhp = gpcpV33_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+diff_gpcpV33_dhp.plot(
+    cmap='RdBu',
+    vmin=-10,
+    vmax=10,
+    figsize=(10, 6),
+    cbar_kwargs={'label': 'Difference (mm/day)'}
+)
+plt.title('Difference: GPCP V3.3 - DHP', fontsize=16)
+plt.show()
 # Function to load the data into a NumPy array
 
 path_to_amip_cimp_data = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/data/zonalmeanprecip_AMIP6_CMIP6'
