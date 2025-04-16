@@ -203,6 +203,73 @@ def plot_mean_maps(gpcp_data1, gpcp_data2, dhp_data, gpcp_var='sat_gauge_precip'
     plt.show()
 
 #------------------------------------------------------------
+def plot_difference_maps(diff1, diff2, vmin=-2, vmax=2, filename=None):
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 6), 
+                    subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True)    
+
+    # Plot difference between GPCP V3.2 and DHP
+    diff1_plot = diff1.plot(
+        ax=axes[0],
+        transform=ccrs.PlateCarree(),
+        cmap='jet',
+        add_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    axes[0].set_title('GPCP V3.2', fontsize=16)
+    axes[0].coastlines()
+    axes[0].add_feature(cfeature.BORDERS, linestyle=':')
+    gl1 = axes[0].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
+    gl1.left_labels = True
+    gl1.right_labels = False
+    gl1.top_labels = False
+    gl1.bottom_labels = True
+    gl1.xlabel_style = {'fontsize': 14}
+    gl1.ylabel_style = {'fontsize': 14}
+    axes[0].xaxis.set_label_position("bottom")
+
+    # Plot difference between GPCP V3.3 and DHP
+    diff2_plot = diff2.plot(
+        ax=axes[1],
+        transform=ccrs.PlateCarree(),
+        cmap='jet',
+        add_colorbar=False,
+        vmin=vmin,
+        vmax=vmax,
+    )
+    axes[1].set_title('GPCP V3.3', fontsize=16)
+    axes[1].coastlines()
+    axes[1].add_feature(cfeature.BORDERS, linestyle=':')
+    gl2 = axes[1].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
+    gl2.left_labels = False
+    gl2.right_labels = True
+    gl2.top_labels = False
+    gl2.xlabel_style = {'fontsize': 14}
+    gl2.ylabel_style = {'fontsize': 14}
+    axes[1].xaxis.set_label_position("bottom")
+
+    # Adjust aspect ratio for all subplots
+    for a in axes.flat:
+        a.set_aspect('auto')
+
+    # Increase font sizes for x and y tick labels
+    for ax in axes:
+        ax.tick_params(axis='both', which='major', labelsize=16)
+
+    # Add a single color bar below the plots
+    cbar = fig.colorbar(diff1_plot, ax=axes, orientation='horizontal', fraction=0.046, pad=0.1)
+    cbar.set_label('Difference in Mean Precipitation (mm/day)', fontsize=15)
+    cbar.ax.tick_params(labelsize=15)
+
+    # Save the figure if a filename is provided
+    if filename:
+        plt.savefig(filename, bbox_inches='tight')
+    plt.show()
+#-------------------------------------------------------------
 
 # def calculate_area_weighted_mean(precip_data, lat_var, precip_var):
 #     """
@@ -467,13 +534,14 @@ aligned_dhp_data = aligned_dhp_data.rio.reproject(aligned_dhp_data.rio.crs,
 
 aligned_dhp_data_mean = aligned_dhp_data.mean(dim='nm',skipna=True)
 
+aligned_dhp_data_mean = aligned_dhp_data_mean.rename({'x':'lon', 'y':'lat'})
+
 #%%
 gpcp_v32_data_path = os.path.join(gpcp_data_path,'data_v3.2')
 gpcp_filesv32 = [os.path.join(gpcp_v32_data_path,x) for x in os.listdir(gpcp_v32_data_path) if x.endswith('.nc4')]
 
 gpcpV32_xr_data = retrun_gpcp_xr_data(gpcp_filesv32)
 gpcpV32_xr_data_mean = gpcpV32_xr_data.mean(dim='time',skipna=True)
-
 
 #-----------------------------------------------------------------------------------------
 gpcp_v33_data_path = os.path.join(gpcp_data_path,'data_v3.3')
@@ -483,7 +551,19 @@ gpcpV33_xr_data = retrun_gpcp_xr_data(gpcp_filesv33)
 gpcpV33_xr_data_mean = gpcpV33_xr_data.mean(dim='time',skipna=True)
 
 # xt = gpcp_xr_data.groupby('lat').mean(dim=['time', 'lon'])
+# Example usage
+nme = os.path.join(path_to_put_plots,'mean_maps_' + cde_run_dte + '.png')
+plot_mean_maps(gpcpV32_xr_data_mean,gpcpV33_xr_data_mean, aligned_dhp_data_mean, filename=nme)
 
+#------------------------------------------------------------------------------------------
+# make and plot difference maps
+gpcpv32_dhp_diff = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+gpcpv33_dhp_diff = gpcpV33_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
+
+# plot the difference maps between gpcps and dhp data_arrays
+# Example usage
+nme_diff = os.path.join(path_to_put_plots, 'difference_maps_' + cde_run_dte + '.png')
+plot_difference_maps(gpcpv32_dhp_diff, gpcpv33_dhp_diff, filename=nme_diff)
 #%%
 # zonal mean claculate
 # Extract the time coordinate from gpcp_xr_data
@@ -498,84 +578,7 @@ aligned_dhp_data_with_time = aligned_dhp_data.assign_coords(time=time_coord)
 
 
 
-# Example usage
-nme = os.path.join(path_to_put_plots,'mean_maps_' + cde_run_dte + '.png')
-plot_mean_maps(gpcpV32_xr_data_mean,gpcpV33_xr_data_mean, aligned_dhp_data_mean, filename=nme)
 
-
-# plot the difference maps between gpcps and dhp data_arrays
-def plot_difference_maps(gpcp_data1, gpcp_data2, dhp_data, gpcp_var='sat_gauge_precip', 
-                         dhp_var='precip_heating', vmin=-10, vmax=10, filename=None):
-    import matplotlib.pyplot as plt
-    import cartopy.crs as ccrs
-    import cartopy.feature as cfeature
-
-    fig, axes = plt.subplots(1, 2, figsize=(18, 6), 
-                    subplot_kw={'projection': ccrs.PlateCarree()}, sharey=True)    
-
-    # Plot difference between GPCP V3.2 and DHP
-    diff1 = gpcp_data1[gpcp_var] - dhp_data[dhp_var]
-    diff1_plot = diff1.plot(
-        ax=axes[1],
-        transform=ccrs.PlateCarree(),
-        cmap='RdBu',
-        add_colorbar=False,
-        vmin=vmin,
-        vmax=vmax,
-    )
-    axes[0].set_title('GPCP V3.2 - DHP', fontsize=16)
-    axes[0].coastlines()
-    axes[0].add_feature(cfeature.BORDERS, linestyle=':')
-    gl1 = axes[1].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
-    gl1.left_labels = False
-    gl1.right_labels = False
-    gl1.top_labels = False
-    gl1.xlabel_style = {'fontsize': 14}
-    gl1.ylabel_style = {'fontsize': 14}
-    axes[0].xaxis.set_label_position("bottom")
-
-    # Plot difference between GPCP V3.3 and DHP
-    diff2 = gpcp_data2[gpcp_var] - dhp_data[dhp_var]
-    diff2_plot = diff2.plot(
-        ax=axes[2],
-        transform=ccrs.PlateCarree(),
-        cmap='RdBu',
-        add_colorbar=False,
-        vmin=vmin,
-        vmax=vmax,
-    )
-    axes[1].set_title('GPCP V3.3 - DHP', fontsize=16)
-    axes[1].coastlines()
-    axes[1].add_feature(cfeature.BORDERS, linestyle=':')
-    gl2 = axes[2].gridlines(draw_labels=True, linestyle='--', x_inline=False, y_inline=False)
-    gl2.left_labels = False
-    gl2.right_labels = True
-    gl2.top_labels = False
-    gl2.xlabel_style = {'fontsize': 14}
-    gl2.ylabel_style = {'fontsize': 14}
-    axes[2].xaxis.set_label_position("bottom")
-
-    # Adjust aspect ratio for all subplots
-    for a in axes.flat:
-        a.set_aspect('auto')
-
-    # Increase font sizes for x and y tick labels
-    for ax in axes:
-        ax.tick_params(axis='both', which='major', labelsize=16)
-
-    # Add a single color bar below the plots
-    cbar = fig.colorbar(diff1_plot, ax=axes, orientation='horizontal', fraction=0.046, pad=0.1)
-    cbar.set_label('Difference in Mean Precipitation (mm/day)', fontsize=15)
-    cbar.ax.tick_params(labelsize=15)
-
-    # Save the figure if a filename is provided
-    if filename:
-        plt.savefig(filename, bbox_inches='tight')
-    plt.show()
-
-# Example usage
-nme_diff = os.path.join(path_to_put_plots, 'difference_maps_' + cde_run_dte + '.png')
-plot_difference_maps(gpcpV32_xr_data_mean, gpcpV33_xr_data_mean, aligned_dhp_data_mean, filename=nme_diff)
 # Calculate and plot the difference between GPCP V3.2 and DHP
 diff_gpcpV32_dhp = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
 diff_gpcpV32_dhp_plot = diff_gpcpV32_dhp.plot(
