@@ -65,7 +65,8 @@ def plot_zonal_means(zonal_means, ylabel='Zonal mean', xlabel='Latitude', filena
 
     # Define the styles for each product
     product_styles = {
-        'GPCP': {'color': 'grey', 'linestyle': '--'},
+        'GPCP V3.2': {'color': 'grey', 'linestyle': '--'},
+        'GPCP V3.3': {'color': 'grey', 'linestyle': '-'},
         'Diabatic precip_heating': {'color': 'black', 'linestyle': '-.'},
         'CMIP6': {'color': 'green', 'linestyle': ':'},
         'AMIP6': {'color': 'orange', 'linestyle': '-.'}
@@ -77,20 +78,21 @@ def plot_zonal_means(zonal_means, ylabel='Zonal mean', xlabel='Latitude', filena
 
         # Plot each product's data for the current region
         for product_name, data in zonal_means.items():
-            print(product_name)
             # Select the appropriate data variable based on the product name
-            if product_name == 'GPCP':
+            if product_name.startswith('GPCP'):
                 data_var = 'sat_gauge_precip'
             elif product_name == 'Diabatic precip_heating':
                 data_var = 'precip_heating'
-            else:     
+            else:
                 data_var = 'zonal_mean_precip'
 
             # Get the style for the current product
             style = product_styles.get(product_name, {'color': 'blue', 'linestyle': '-'})
 
-            ax.plot(data[region].coords['lat'], data[region][data_var], 
-                    linestyle=style['linestyle'], color=style['color'], label=product_name)
+            # Ensure the region exists in the data before plotting
+            if region in data:
+                ax.plot(data[region].coords['lat'], data[region][data_var], 
+                        linestyle=style['linestyle'], color=style['color'], label=product_name)
 
         # Set the title and labels with the desired font sizes
         ax.set_title(f"{region}", fontsize=20)
@@ -108,12 +110,12 @@ def plot_zonal_means(zonal_means, ylabel='Zonal mean', xlabel='Latitude', filena
 
         # Add legend to only the first subplot
         if j == 0:
-            ax.legend(fontsize=15, frameon=False,ncol=2)
+            ax.legend(fontsize=12, frameon=False, ncol=2)
 
     # Adjust layout and save the figure if a filename is provided
     fig.tight_layout()
     if filename:
-        plt.savefig(filename,bbox_inches='tight')
+        plt.savefig(filename, bbox_inches='tight')
     plt.show()
 #------------------------------------------------------------
 def plot_mean_maps(gpcp_data1, gpcp_data2, dhp_data, gpcp_var='sat_gauge_precip', 
@@ -576,63 +578,10 @@ aligned_dhp_data_with_time = aligned_dhp_data.assign_coords(time=time_coord)
 
 # gpcp_xr_data_sel = gpcp_xr_data.sel(time='2001-01-01')
 
-
-
-
-# Calculate and plot the difference between GPCP V3.2 and DHP
-diff_gpcpV32_dhp = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
-diff_gpcpV32_dhp_plot = diff_gpcpV32_dhp.plot(
-    cmap='RdBu',
-    vmin=-10,
-    vmax=10,
-    figsize=(10, 6),
-    cbar_kwargs={'label': 'Difference (mm/day)'}
-)
-plt.title('Difference: GPCP V3.2 - DHP', fontsize=16)
-plt.xlabel('Longitude', fontsize=14)
-plt.ylabel('Latitude', fontsize=14)
-plt.show()
-
-# Calculate and plot the difference between GPCP V3.3 and DHP
-diff_gpcpV33_dhp = gpcpV33_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
-diff_gpcpV33_dhp_plot = diff_gpcpV33_dhp.plot(
-    cmap='RdBu',
-    vmin=-10,
-    vmax=10,
-    figsize=(10, 6),
-    cbar_kwargs={'label': 'Difference (mm/day)'}
-)
-plt.title('Difference: GPCP V3.3 - DHP', fontsize=16)
-plt.xlabel('Longitude', fontsize=14)
-plt.ylabel('Latitude', fontsize=14)
-plt.show()
 #%%
-# Calculate and plot the difference between GPCP V3.2 and DHP
-diff_gpcpV32_dhp = gpcpV32_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
-diff_gpcpV32_dhp.plot(
-    cmap='RdBu',
-    vmin=-10,
-    vmax=10,
-    figsize=(10, 6),
-    cbar_kwargs={'label': 'Difference (mm/day)'}
-)
-plt.title('Difference: GPCP V3.2 - DHP', fontsize=16)
-plt.show()
-
-# Calculate and plot the difference between GPCP V3.3 and DHP
-diff_gpcpV33_dhp = gpcpV33_xr_data_mean['sat_gauge_precip'] - aligned_dhp_data_mean['precip_heating']
-diff_gpcpV33_dhp.plot(
-    cmap='RdBu',
-    vmin=-10,
-    vmax=10,
-    figsize=(10, 6),
-    cbar_kwargs={'label': 'Difference (mm/day)'}
-)
-plt.title('Difference: GPCP V3.3 - DHP', fontsize=16)
-plt.show()
 # Function to load the data into a NumPy array
 
-path_to_amip_cimp_data = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/data/zonalmeanprecip_AMIP6_CMIP6'
+path_to_amip_cimp_data = r'/ra1/pubdat/AVHRR_CloudSat_proj/diabatic_heating_precipitation_200101_201812/data/zonalmeanprecip_AMIP6_CMIP6'
 
 amip_cimp_files = [os.path.join(path_to_amip_cimp_data,d) for d in os.listdir(path_to_amip_cimp_data)]
 
@@ -646,13 +595,19 @@ amip6_dats = [x for x in data_arrays if x[1].startswith('AMIP6')]
 
 # zonal means 
 dhp_znl_cmb, dhp_znl_lnd, dhp_znl_oc = zonal_compute(aligned_dhp_data_with_time,'dhp')
-gpcp_znl_cmb, gpcp_znl_lnd, gpcp_znl_oc = zonal_compute(gpcp_xr_data,'gpcp')
+gpcpv32_znl_cmb, gpcpv32_znl_lnd, gpcpv32_znl_oc = zonal_compute(gpcpV32_xr_data,'gpcp')
+gpcpv33_znl_cmb, gpcpv33_znl_lnd, gpcpv33_znl_oc = zonal_compute(gpcpV33_xr_data,'gpcp')
 
 zonal_means = {}
-zonal_means['GPCP'] = {
-        'COMBINED': gpcp_znl_cmb,
-        'LAND': gpcp_znl_lnd,
-        'OCEAN': gpcp_znl_oc,}
+zonal_means['GPCP V3.2'] = {
+        'COMBINED': gpcpv32_znl_cmb,
+        'LAND': gpcpv32_znl_lnd,
+        'OCEAN': gpcpv32_znl_oc,}
+
+zonal_means['GPCP V3.3'] = {
+        'COMBINED': gpcpv33_znl_cmb,
+        'LAND': gpcpv33_znl_lnd,
+        'OCEAN': gpcpv33_znl_oc,}
 
 zonal_means['Diabatic precip_heating'] = {
         'COMBINED': dhp_znl_cmb,
@@ -678,7 +633,8 @@ plot_zonal_means(zonal_means, ylabel="Mean Precipitation (mm/day)", xlabel="Lati
 
 
 #%%
-mean_df = pd.DataFrame(columns=['GPCP', 'Diabatic precip_heating', 'AMIP6', 'CMIP6'],
+mean_df = pd.DataFrame(columns=['GPCP V3.2', 'GPCP V3.3', 'Diabatic precip_heating', 
+                                'AMIP6', 'CMIP6'],
                        index=['Combined', 'Land', 'Ocean'])
 
 
@@ -742,20 +698,33 @@ cmip6_precip_data_land = load_ascii_data(cmip6_land_file)
 cmip6_precip_data_ocean = load_ascii_data(cmip6_ocean_file)
 cmip6_precip_data_lo = load_ascii_data(cmip6_lo_file)
 
-mean_df.loc['Combined', 'GPCP'] = calculate_area_weighted_mean(gpcp_znl_cmb['sat_gauge_precip'],gpcp_znl_cmb.lat.values,
-                                                              None,'cmb').round(2)
+mean_df.loc['Combined', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_cmb['sat_gauge_precip'],
+                                                                    gpcpv32_znl_cmb.lat.values,
+                                                                    None,'cmb').round(2)
 
 # arrange the lat values to conform to land_area_fraction
-gpcp_znl_lnd_ = gpcp_znl_lnd.sortby('lat', ascending=True)
+gpcpv32_znl_lnd_ = gpcpv32_znl_lnd.sortby('lat', ascending=True)
 
-mean_df.loc['Land', 'GPCP'] = calculate_area_weighted_mean(gpcp_znl_lnd['sat_gauge_precip'],gpcp_znl_lnd.lat.values,
+mean_df.loc['Land', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_lnd['sat_gauge_precip'],gpcpv32_znl_lnd.lat.values,
                                                                land_area_fraction,'l').round(2)
 
-gpcp_znl_o_ = gpcp_znl_oc.sortby('lat', ascending=True)
+gpcpv32_znl_o_ = gpcpv32_znl_oc.sortby('lat', ascending=True)
 
-mean_df.loc['Ocean', 'GPCP'] = calculate_area_weighted_mean(gpcp_znl_oc['sat_gauge_precip'],gpcp_znl_oc.lat.values,
+mean_df.loc['Ocean', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_oc['sat_gauge_precip'],gpcpv32_znl_oc.lat.values,
                                                                ocean_area_fraction,'o').round(2)
-#---------------------------
+#---------------------------------------------------------------------------------------------------------------------------------
+
+mean_df.loc['Combined', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_cmb['sat_gauge_precip'],
+                                                                    gpcpv33_znl_cmb.lat.values,
+                                                                    None,'cmb').round(2)
+# arrange the lat values to conform to land_area_fraction
+gpcpv33_znl_lnd_ = gpcpv33_znl_lnd.sortby('lat', ascending=True)
+mean_df.loc['Land', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_lnd['sat_gauge_precip'],gpcpv33_znl_lnd.lat.values,
+                                                                land_area_fraction,'l').round(2)
+gpcpv33_znl_o_ = gpcpv33_znl_oc.sortby('lat', ascending=True)
+mean_df.loc['Ocean', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_oc['sat_gauge_precip'],gpcpv33_znl_oc.lat.values,
+                                                                ocean_area_fraction,'o').round(2)
+#-------------------------------------------------------------------------------------------------------------------------------------
 mean_df.loc['Combined', 'Diabatic precip_heating'] = calculate_area_weighted_mean(dhp_znl_cmb['precip_heating'],dhp_znl_cmb.lat.values,
                                                               None,'cmb').round(2)
 
