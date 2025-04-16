@@ -40,14 +40,21 @@ def zonal_compute(arr, prdt):
     grpby = 'time' if prdt == 'gpcp' else 'nm'
     # Calculate combined zonal mean
     combined_zonal_mean = arr.groupby('lat').mean(dim=[grpby, 'lon'])
+    # combined_zonal_mean = arr.groupby('lat').mean(dim='lon')
     
     # Mask land and ocean data using the land-sea mask (assuming 1 for land, 0 for ocean)
     land_data = arr.where(lsm.data == 1)
     ocean_data = arr.where(lsm.data == 0)
+
+    # land_data = arr.where(land_mask)
+    # ocean_data = arr.where(ocean_mask)
     
-    # Calculate zonal mean for land and ocean data
+    # # Calculate zonal mean for land and ocean data
     land_zonal_mean = land_data.groupby('lat').mean(dim=[grpby, 'lon'])
     ocean_zonal_mean = ocean_data.groupby('lat').mean(dim=[grpby, 'lon'])
+
+    # land_zonal_mean = land_data.groupby('lat').mean(dim='lon')
+    # ocean_zonal_mean = ocean_data.groupby('lat').mean(dim='lon')
     
     return combined_zonal_mean, land_zonal_mean, ocean_zonal_mean
 #------------------------------------------------------------
@@ -463,6 +470,9 @@ lsm = lsm.rio.reproject(lsm.rio.crs,
 
 lsm = lsm.rename({'x': 'lon', 'y': 'lat'})
 
+lndf = lsm.where(lsm.data == 1).sum(dim='lon')/144
+ocf = xr.where(lsm == 0, 1, 0).sum(dim='lon') / 144
+
 # Assuming the mask variable is named 'mask' and it contains percentage values from 0 to 100
 land_sea_mask = lsm_ds['landseamask']  # Replace 'mask' with the actual variable name if different
 land_sea_mask.rio.write_crs(cc.to_string(), inplace=True)
@@ -475,17 +485,19 @@ land_sea_mask = land_sea_mask.rio.reproject(land_sea_mask.rio.crs,
 # >= 75% means ocean, < 75% means land
 ocean_mask = land_sea_mask >= 75
 land_mask = land_sea_mask < 75
-
+ocean_mask = ocean_mask.rename({'x': 'lon', 'y': 'lat'})
+land_mask = land_mask.rename({'x': 'lon', 'y': 'lat'})
 # Calculate the total number of grid cells per latitude band (assuming 'lon' is the longitude dimension)
 total_cells_per_lat = land_sea_mask.shape[-1]  # This corresponds to the number of longitude points
 
 # Calculate the area fraction for ocean and land for each latitude band
-ocean_area_fraction = ocean_mask.sum(dim='x') / total_cells_per_lat
-land_area_fraction = land_mask.sum(dim='x') / total_cells_per_lat
+ocean_area_fraction = ocean_mask.sum(dim='lon') / total_cells_per_lat
+land_area_fraction = land_mask.sum(dim='lon') / total_cells_per_lat
 
 # Convert these to numpy arrays if needed
 ocean_area_fraction = ocean_area_fraction.values
 land_area_fraction = land_area_fraction.values
+
 #%%
 dhp_file = os.path.join(data_path,'diabatic_heating_precipitation_200101_201812.v2.nc')
 
@@ -634,9 +646,9 @@ plot_zonal_means(zonal_means, ylabel="Mean Precipitation (mm/day)", xlabel="Lati
 
 #%%
 mean_df = pd.DataFrame(columns=['GPCP V3.2', 'GPCP V3.3', 'Diabatic precip_heating', 
-                                'AMIP6', 'CMIP6'],
+                                ],
                        index=['Combined', 'Land', 'Ocean'])
-
+# 'AMIP6', 'CMIP6'
 
 # Load the land-sea mask
 ls_msk = r'/ra1/pubdat/AVHRR_CloudSat_proj/IMERG/ancillary_imerg_data/GPM_IMERG_LandSeaMask.2.nc4'
@@ -705,39 +717,56 @@ mean_df.loc['Combined', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_
 # arrange the lat values to conform to land_area_fraction
 gpcpv32_znl_lnd_ = gpcpv32_znl_lnd.sortby('lat', ascending=True)
 
-mean_df.loc['Land', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_lnd['sat_gauge_precip'],gpcpv32_znl_lnd.lat.values,
-                                                               land_area_fraction,'l').round(2)
+mean_df.loc['Land', 'GPCP V3.2'] = calculate_area_weighted_mean(
+                                   gpcpv32_znl_lnd['sat_gauge_precip'],
+                                   gpcpv32_znl_lnd.lat.values,
+                                   land_area_fraction,'l').round(2)
 
 gpcpv32_znl_o_ = gpcpv32_znl_oc.sortby('lat', ascending=True)
 
-mean_df.loc['Ocean', 'GPCP V3.2'] = calculate_area_weighted_mean(gpcpv32_znl_oc['sat_gauge_precip'],gpcpv32_znl_oc.lat.values,
-                                                               ocean_area_fraction,'o').round(2)
+mean_df.loc['Ocean', 'GPCP V3.2'] = calculate_area_weighted_mean(
+                                    gpcpv32_znl_oc['sat_gauge_precip'],
+                                    gpcpv32_znl_oc.lat.values,
+                                    ocean_area_fraction,'o').round(2)
 #---------------------------------------------------------------------------------------------------------------------------------
 
-mean_df.loc['Combined', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_cmb['sat_gauge_precip'],
-                                                                    gpcpv33_znl_cmb.lat.values,
-                                                                    None,'cmb').round(2)
+mean_df.loc['Combined', 'GPCP V3.3'] = calculate_area_weighted_mean(
+                                       gpcpv33_znl_cmb['sat_gauge_precip'],
+                                       gpcpv33_znl_cmb.lat.values,
+                                       None,'cmb').round(2)
+
 # arrange the lat values to conform to land_area_fraction
 gpcpv33_znl_lnd_ = gpcpv33_znl_lnd.sortby('lat', ascending=True)
-mean_df.loc['Land', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_lnd['sat_gauge_precip'],gpcpv33_znl_lnd.lat.values,
-                                                                land_area_fraction,'l').round(2)
+mean_df.loc['Land', 'GPCP V3.3'] = calculate_area_weighted_mean(
+                                   gpcpv33_znl_lnd['sat_gauge_precip'],
+                                   gpcpv33_znl_lnd.lat.values,
+                                   land_area_fraction,'l').round(2)
+
 gpcpv33_znl_o_ = gpcpv33_znl_oc.sortby('lat', ascending=True)
-mean_df.loc['Ocean', 'GPCP V3.3'] = calculate_area_weighted_mean(gpcpv33_znl_oc['sat_gauge_precip'],gpcpv33_znl_oc.lat.values,
-                                                                ocean_area_fraction,'o').round(2)
+mean_df.loc['Ocean', 'GPCP V3.3'] = calculate_area_weighted_mean(
+                                    gpcpv33_znl_oc['sat_gauge_precip'],
+                                    gpcpv33_znl_oc.lat.values,
+                                    ocean_area_fraction,'o').round(2)
 #-------------------------------------------------------------------------------------------------------------------------------------
-mean_df.loc['Combined', 'Diabatic precip_heating'] = calculate_area_weighted_mean(dhp_znl_cmb['precip_heating'],dhp_znl_cmb.lat.values,
-                                                              None,'cmb').round(2)
+mean_df.loc['Combined', 'Diabatic precip_heating'] = calculate_area_weighted_mean(
+                                                     dhp_znl_cmb['precip_heating'],
+                                                     dhp_znl_cmb.lat.values,
+                                                     None,'cmb').round(2)
 
 # arrange the lat values to conform to land_area_fraction
 dhp_znl_lnd_ = dhp_znl_lnd.sortby('lat', ascending=True)
 
-mean_df.loc['Land', 'Diabatic precip_heating'] = calculate_area_weighted_mean(dhp_znl_lnd['precip_heating'],dhp_znl_lnd.lat.values,
-                                                               land_area_fraction,'l').round(2)
+mean_df.loc['Land', 'Diabatic precip_heating'] = calculate_area_weighted_mean(
+                                                 dhp_znl_lnd['precip_heating'],
+                                                 dhp_znl_lnd.lat.values,
+                                                 land_area_fraction,'l').round(2)
 
 dhp_znl_o_ = dhp_znl_oc.sortby('lat', ascending=True)
 
-mean_df.loc['Ocean', 'Diabatic precip_heating'] = calculate_area_weighted_mean(dhp_znl_oc['precip_heating'],dhp_znl_oc.lat.values,
-                                                               ocean_area_fraction,'o').round(2)
+mean_df.loc['Ocean', 'Diabatic precip_heating'] = calculate_area_weighted_mean(
+                                                  dhp_znl_oc['precip_heating'],
+                                                  dhp_znl_oc.lat.values,
+                                                  ocean_area_fraction,'o').round(2)
 
 # Define latitudes
 # latitudes = np.linspace(-90, 90, 72)
@@ -755,3 +784,15 @@ mean_df.loc['Combined', 'CMIP6'] = calculate_area_weighted_mean(cmip6_precip_dat
 nme = '_'.join(['mean_df', cde_run_dte]) + '.csv'
 nme = os.path.join(r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/results/', nme)
 mean_df.to_csv(nme)
+
+
+
+#%%
+# Compute cosine latitude weights
+weights = np.cos(np.deg2rad(gpcpV32_xr_data_mean.lat))       
+
+# Apply the weights to the precipitation data
+weighted_precip = gpcpV32_xr_data_mean['sat_gauge_precip'] * weights
+
+# Calculate the area-weighted mean precipitation
+area_weighted_mean = np.nansum(weighted_precip) / np.nansum(weights)  
