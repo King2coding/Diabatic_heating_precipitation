@@ -300,7 +300,7 @@ def load_ascii_data_to_xr(file_path):
     return ds, prdt_nme
 #%%
 data_path = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/data'
-gpcp_data_path = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/data/GPCP_200101_201812/data'
+gpcp_data_path = r'/ra1/pubdat/AVHRR_CloudSat_proj/diabatic_heating_precipitation_200101_201812/data/GPCP_200101_201812/'
 path_to_put_plots = r'/ra1/pubdat/diabatic_heating_precipitation_200101_201812/results/plots'
 
 #%%
