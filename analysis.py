@@ -445,33 +445,33 @@ path_to_put_plots = r'/home/kkumah/Projects/Diabatic_heating_precipitation_20010
 
 #%%
 cde_run_dte = str(date.today().strftime('%Y%m%d'))
+cc = CRS.from_authority(code=4326,auth_name='EPSG')
 
 # Open the dataset and select the land-sea mask data
 land_sea_mask_path = '/ra1/pubdat/AVHRR_CloudSat_proj/IMERG/ancillary_imerg_data/GPM_IMERG_LandSeaMask.2.nc4'
 lsm_ds = xr.open_dataset(land_sea_mask_path)
-lsm_arr = lsm_ds['landseamask']
+# lsm_arr = lsm_ds['landseamask']
 
-# Transpose the data to get longitude on the x-axis
-lsm_transposed = lsm_arr.transpose('lat', 'lon')
+# # Transpose the data to get longitude on the x-axis
+# lsm_transposed = lsm_arr.transpose('lat', 'lon')
 
-# Flip the latitude axis so that latitude is displayed south to north
-lsm_flipped = lsm_transposed.isel(lat=slice(None, None, -1))
+# # Flip the latitude axis so that latitude is displayed south to north
+# lsm_flipped = lsm_transposed.isel(lat=slice(None, None, -1))
 
-# Apply the land-sea mask condition
-lsm = xr.where(lsm_flipped < 25, 1, 0)
+# # Apply the land-sea mask condition
+# lsm = xr.where(lsm_flipped < 25, 1, 0)
 
-cc = CRS.from_authority(code=4326,auth_name='EPSG')
 
-lsm.rio.write_crs(cc.to_string(), inplace=True)
+# lsm.rio.write_crs(cc.to_string(), inplace=True)
 
-lsm = lsm.rio.reproject(lsm.rio.crs, 
-                        shape=(72, 144), # set the shape as the autosnow data shape
-                        resampling=Resampling.mode,)
+# lsm = lsm.rio.reproject(lsm.rio.crs, 
+#                         shape=(72, 144), # set the shape as the autosnow data shape
+#                         resampling=Resampling.mode,)
 
-lsm = lsm.rename({'x': 'lon', 'y': 'lat'})
+# lsm = lsm.rename({'x': 'lon', 'y': 'lat'})
 
-lndf = lsm.where(lsm.data == 1).sum(dim='lon')/144
-ocf = xr.where(lsm == 0, 1, 0).sum(dim='lon') / 144
+# lndf = lsm.where(lsm.data == 1).sum(dim='lon')/144
+# ocf = xr.where(lsm == 0, 1, 0).sum(dim='lon') / 144
 
 # Assuming the mask variable is named 'mask' and it contains percentage values from 0 to 100
 land_sea_mask = lsm_ds['landseamask']  # Replace 'mask' with the actual variable name if different
